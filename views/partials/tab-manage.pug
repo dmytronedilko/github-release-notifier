@@ -1,0 +1,18 @@
+include ../mixins/ui.pug
+
+#panel-manage.panel
+  .alert#mgmt-alert
+
+  form#manage-form(novalidate)
+    .field
+      label(for="mgmt-apikey") API Key
+      +passwordRow('mgmt-apikey', 'Paste your API key')
+      p.hint Generate a key in the #[a(href="#" onclick="switchTab('apikey');return false" style="color:var(--accent);text-decoration:none") API Key] tab. Add a #[a(href="#" onclick="switchTab('github');return false" style="color:var(--accent);text-decoration:none") GitHub token] for higher rate limits.
+
+    .field
+      label(for="mgmt-email") Email address
+      input#mgmt-email(type="email" placeholder="you@example.com" autocomplete="email" required)
+
+    button.btn(type="submit" id="mgmt-btn") Load subscriptions
+
+  ul.sub-list#sub-list(hidden)

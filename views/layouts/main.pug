@@ -1,0 +1,532 @@
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title GitHub Release Notifier
+    link(rel="icon" href="/favicon.svg" type="image/svg+xml")
+    style.
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #7d8590;
+        --accent: #2f81f7;
+        --accent-hv: #388bfd;
+        --success: #3fb950;
+        --danger: #f85149;
+        --warn: #d29922;
+        --radius: 10px;
+        --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      }
+
+      body {
+        font-family: var(--font);
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 2rem 1rem;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 2rem;
+        width: 100%;
+        max-width: 612px;
+      }
+
+      /* ── header ── */
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1.75rem;
+      }
+      .header svg {
+        flex-shrink: 0;
+      }
+      .header h1 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+      .header p {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-top: 0.2rem;
+      }
+
+      /* ── tabs ── */
+      .tabs {
+        display: flex;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 1.5rem;
+      }
+      .tab-btn {
+        flex: 1;
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.875rem;
+        padding: 0.5rem 1rem 0.6rem;
+        margin-bottom: -1px;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+      }
+      .tab-btn:hover {
+        color: var(--text);
+      }
+      .tab-btn.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+      }
+
+      /* ── panels ── */
+      .panel {
+        display: none;
+      }
+      .panel.active {
+        display: block;
+      }
+
+      /* ── form ── */
+      .field {
+        margin-bottom: 1rem;
+      }
+      label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--muted);
+        margin-bottom: 0.4rem;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+      }
+      input[type='text'],
+      input[type='email'],
+      input[type='password'] {
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font: inherit;
+        font-size: 0.9rem;
+        padding: 0.55rem 0.75rem;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+        outline: none;
+      }
+      input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(47, 129, 247, 0.25);
+      }
+      .hint {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 0.35rem;
+      }
+
+      /* ── key row ── */
+      .key-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-end;
+        margin-bottom: 1rem;
+      }
+      .key-row .field {
+        flex: 1;
+        margin-bottom: 0;
+      }
+      .icon-btn {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--muted);
+        cursor: pointer;
+        height: 36px;
+        width: 36px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+        margin-bottom: 0;
+      }
+      .icon-btn:hover {
+        color: var(--text);
+        border-color: var(--muted);
+      }
+      .gen-btn {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--muted);
+        cursor: pointer;
+        height: 36px;
+        padding: 0 0.6rem;
+        font: inherit;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        flex-shrink: 0;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+      }
+      .gen-btn:hover {
+        color: var(--text);
+        border-color: var(--muted);
+      }
+      .gen-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* ── button ── */
+      .btn {
+        display: block;
+        width: 100%;
+        background: var(--accent);
+        border: none;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 0.6rem 1rem;
+        transition:
+          background 0.15s,
+          opacity 0.15s;
+        margin-top: 1.25rem;
+      }
+      .btn:hover {
+        background: var(--accent-hv);
+      }
+      .btn:active {
+        opacity: 0.85;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn-ghost {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+      .btn-ghost:hover {
+        background: var(--border);
+      }
+
+      /* ── alert ── */
+      .alert {
+        border-radius: 6px;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1rem;
+        display: none;
+      }
+      .alert.visible {
+        display: block;
+      }
+      .alert-success {
+        background: rgba(63, 185, 80, 0.12);
+        border: 1px solid rgba(63, 185, 80, 0.4);
+        color: var(--success);
+      }
+      .alert-error {
+        background: rgba(248, 81, 73, 0.12);
+        border: 1px solid rgba(248, 81, 73, 0.4);
+        color: var(--danger);
+      }
+      .alert-info {
+        background: rgba(47, 129, 247, 0.12);
+        border: 1px solid rgba(47, 129, 247, 0.4);
+        color: var(--accent);
+      }
+      .alert-warn {
+        background: rgba(210, 153, 34, 0.12);
+        border: 1px solid rgba(210, 153, 34, 0.4);
+        color: var(--warn);
+      }
+
+      /* ── subscriptions list ── */
+      .sub-list {
+        list-style: none;
+        margin-top: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .sub-item {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.65rem 0.85rem;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-size: 0.875rem;
+      }
+      .sub-item .repo {
+        flex: 1;
+        font-weight: 500;
+      }
+      .badge {
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.15rem 0.45rem;
+        border-radius: 20px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .badge-ok {
+        background: rgba(63, 185, 80, 0.2);
+        color: var(--success);
+      }
+      .badge-pending {
+        background: rgba(210, 153, 34, 0.2);
+        color: var(--warn);
+      }
+
+      /* ── token page ── */
+      #token-panel .icon-circle {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        margin: 0 auto 1.25rem;
+      }
+      .icon-circle-success {
+        background: rgba(63, 185, 80, 0.15);
+      }
+      .icon-circle-danger {
+        background: rgba(248, 81, 73, 0.15);
+      }
+      #token-panel h2 {
+        text-align: center;
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+      }
+      #token-panel p {
+        text-align: center;
+        font-size: 0.875rem;
+        color: var(--muted);
+      }
+
+      /* ── spinner ── */
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        vertical-align: middle;
+        margin-right: 0.35rem;
+      }
+
+      input[type='date'] {
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font: inherit;
+        font-size: 0.9rem;
+        padding: 0.55rem 0.75rem;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+        outline: none;
+        color-scheme: dark;
+      }
+      input[type='date']:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(47, 129, 247, 0.25);
+      }
+
+      /* ── key card ── */
+      .key-card {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.75rem 0.85rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 0.85rem;
+      }
+      .key-card-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .key-card-name {
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .key-card-meta {
+        color: var(--muted);
+        font-size: 0.75rem;
+        margin-top: 0.2rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem 0.75rem;
+      }
+      .key-card-hint {
+        font-family: monospace;
+        color: var(--muted);
+        font-size: 0.8rem;
+        flex-shrink: 0;
+      }
+      .key-card .badge-expired {
+        background: rgba(248, 81, 73, 0.2);
+        color: var(--danger);
+      }
+      .key-delete-btn {
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--muted);
+        cursor: pointer;
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+      }
+      .key-delete-btn:hover {
+        color: var(--danger);
+        border-color: var(--danger);
+      }
+
+      .divider {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 1.5rem 0;
+      }
+
+      /* ── user bar ── */
+      .user-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-left: auto;
+        font-size: 0.8rem;
+      }
+      .user-bar[hidden] {
+        display: none;
+      }
+      .user-bar img {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+      }
+      .user-bar span {
+        color: var(--text);
+        font-weight: 500;
+      }
+      .logout-btn {
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.75rem;
+        padding: 0.2rem 0.4rem;
+        border-radius: 4px;
+        transition: color 0.15s;
+      }
+      .logout-btn:hover {
+        color: var(--danger);
+      }
+
+      /* ── GitHub login ── */
+      .github-login-section {
+        text-align: center;
+        padding: 2rem 0 1rem;
+      }
+      .github-login-section p {
+        color: var(--muted);
+        font-size: 0.875rem;
+        margin-bottom: 1.25rem;
+      }
+      .btn-github {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: #24292f;
+        color: #fff;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.6rem 1.25rem;
+        font: inherit;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .btn-github:hover {
+        background: #32383f;
+      }
+
+      footer {
+        margin-top: 1.25rem;
+        text-align: center;
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+      footer a {
+        color: var(--muted);
+        text-decoration: none;
+      }
+      footer a:hover {
+        color: var(--text);
+      }
+
+  body
+    block content
+    footer
+      | Powered by
+      |
+      a(href="https://docs.github.com/en/rest" target="_blank" rel="noopener") GitHub API
+    block scripts

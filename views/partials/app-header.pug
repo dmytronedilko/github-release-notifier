@@ -1,0 +1,11 @@
+include ../mixins/ui.pug
+
+.header
+  +githubMark(36, '#e6edf3')
+  div
+    h1 GitHub Release Notifier
+    p Get emailed when repositories ship new releases.
+  .user-bar#user-bar(hidden)
+    img#user-avatar(src="" alt="")
+    span#user-name
+    button.logout-btn(onclick="logout()" title="Log out") Logout

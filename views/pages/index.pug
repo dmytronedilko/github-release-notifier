@@ -1,0 +1,588 @@
+extends ../layouts/main.pug
+
+block content
+  .card#app
+    include ../partials/app-header.pug
+
+    include ../partials/token-panel.pug
+
+    #main-ui
+      .tabs(role="tablist")
+        button.tab-btn.active(role="tab" id="tab-subscribe" onclick="switchTab('subscribe')") Subscribe
+        button.tab-btn(role="tab" id="tab-manage" onclick="switchTab('manage')") My subscriptions
+        button.tab-btn(role="tab" id="tab-github" onclick="switchTab('github')") GitHub Token
+        button.tab-btn(role="tab" id="tab-apikey" onclick="switchTab('apikey')") API Key
+
+      include ../partials/tab-subscribe.pug
+      include ../partials/tab-manage.pug
+      include ../partials/tab-github.pug
+      include ../partials/tab-apikey.pug
+
+block scripts
+  script.
+    // ── Config ────────────────────────────────────────────────────────────
+    const API = '/api';
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+    function qs(id) {
+      return document.getElementById(id);
+    }
+
+    function showAlert(id, type, html) {
+      const el = qs(id);
+      el.className = `alert alert-${type} visible`;
+      el.innerHTML = html;
+    }
+    function clearAlert(id) {
+      const el = qs(id);
+      el.className = 'alert';
+      el.innerHTML = '';
+    }
+
+    function setLoading(btnId, loading) {
+      const btn = qs(btnId);
+      if (loading) {
+        btn.disabled = true;
+        btn._orig = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner"></span>Working…';
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = btn._orig ?? btn.innerHTML;
+      }
+    }
+
+    function toggleVis(inputId, btn) {
+      const inp = qs(inputId);
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+      btn.title = inp.type === 'password' ? 'Show' : 'Hide';
+    }
+
+    // ── Tabs ──────────────────────────────────────────────────────────────
+    function switchTab(name) {
+      ['subscribe', 'manage', 'github', 'apikey'].forEach((t) => {
+        qs(`tab-${t}`).classList.toggle('active', t === name);
+        qs(`panel-${t}`).classList.toggle('active', t === name);
+      });
+      localStorage.setItem('activeTab', name);
+    }
+
+    function showSubscribeTab() {
+      qs('token-panel').classList.remove('active');
+      qs('main-ui').style.display = '';
+      switchTab('subscribe');
+      window.history.replaceState({}, '', '/');
+    }
+
+    // ── Generate API key ─────────────────────────────────────────────────
+    qs('apikey-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await generateApiKey();
+    });
+
+    async function generateApiKey() {
+      const btn = qs('gen-key-btn');
+      btn.disabled = true;
+      clearAlert('apikey-alert');
+
+      const name = qs('apikey-name').value.trim() || 'Unnamed key';
+      const expiresRaw = qs('apikey-expires').value;
+      const body = { name };
+      if (expiresRaw) {
+        body.expiresAt = new Date(expiresRaw + 'T23:59:59').toISOString();
+      }
+
+      try {
+        const res = await fetch(`${API}/auth/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok || res.status === 201) {
+          const key = data.apiKey;
+          qs('settings-key').value = key;
+          qs('settings-key').type = 'text';
+          showAlert(
+            'apikey-alert',
+            'success',
+            "<strong>API key generated!</strong> Copy and save it — it won't be shown again.",
+          );
+          qs('apikey-name').value = '';
+          qs('apikey-expires').value = '';
+          loadApiKeys();
+        } else if (res.status === 429) {
+          showAlert(
+            'apikey-alert',
+            'error',
+            data.error ?? 'Rate limit exceeded. Try again later.',
+          );
+        } else {
+          showAlert('apikey-alert', 'error', data.error ?? `Error ${res.status}`);
+        }
+      } catch {
+        showAlert('apikey-alert', 'error', 'Network error — is the server running?');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // ── Load & render API keys list ─────────────────────────────────────
+    async function loadApiKeys() {
+      const list = qs('keys-list');
+      const empty = qs('keys-list-empty');
+
+      try {
+        const res = await fetch(`${API}/auth/keys`);
+        const keys = await res.json().catch(() => []);
+
+        list.innerHTML = '';
+
+        if (!Array.isArray(keys) || keys.length === 0) {
+          empty.textContent = 'No API keys yet. Generate one above.';
+          empty.style.display = '';
+          return;
+        }
+
+        empty.style.display = 'none';
+
+        keys.forEach((k) => {
+          const isExpired = k.expiresAt && new Date(k.expiresAt) < new Date();
+          const createdStr = new Date(k.createdAt).toLocaleDateString();
+          const expiresStr = k.expiresAt
+            ? new Date(k.expiresAt).toLocaleDateString()
+            : 'Never';
+
+          const card = document.createElement('div');
+          card.className = 'key-card';
+          card.innerHTML = `
+            <div class="key-card-info">
+              <div class="key-card-name">${escHtml(k.name)}</div>
+              <div class="key-card-meta">
+                <span>Created: ${createdStr}</span>
+                <span>Expires: ${expiresStr}</span>
+                <span>Used: ${k.usageCount} times</span>
+              </div>
+            </div>
+            <span class="key-card-hint">…${escHtml(k.keyHint)}</span>
+            ${isExpired ? '<span class="badge badge-expired">Expired</span>' : '<span class="badge badge-ok">Active</span>'}
+            <button type="button" class="key-delete-btn" title="Delete key" data-key-id="${k.id}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                <path d="M10 11v6"/><path d="M14 11v6"/>
+                <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+              </svg>
+            </button>
+          `;
+          list.appendChild(card);
+        });
+
+        list.querySelectorAll('.key-delete-btn').forEach((btn) => {
+          btn.addEventListener('click', () => deleteApiKey(btn.dataset.keyId));
+        });
+      } catch {
+        empty.textContent = 'Could not load keys.';
+        empty.style.display = '';
+      }
+    }
+
+    async function deleteApiKey(id) {
+      if (!confirm('Delete this API key? This cannot be undone.')) return;
+
+      try {
+        const res = await fetch(`${API}/auth/keys/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          showAlert('apikey-alert', 'success', 'API key deleted.');
+          loadApiKeys();
+        } else {
+          const data = await res.json().catch(() => ({}));
+          showAlert('apikey-alert', 'error', data.error ?? 'Failed to delete key.');
+        }
+      } catch {
+        showAlert('apikey-alert', 'error', 'Network error.');
+      }
+    }
+
+    function copyKey() {
+      const key = qs('settings-key').value;
+      if (!key) return;
+      navigator.clipboard.writeText(key).then(() => {
+        showAlert('apikey-alert', 'success', 'API key copied to clipboard.');
+      });
+    }
+
+    // ── GitHub tokens (stored in DB) ──────────────────────────────────────
+    async function saveGithubToken() {
+      clearAlert('github-alert');
+      const token = qs('settings-github-token').value.trim();
+      const name = qs('github-token-name').value.trim() || 'Unnamed token';
+
+      if (!token) {
+        showAlert('github-alert', 'error', 'Token value is required.');
+        return;
+      }
+
+      const btn = qs('save-gh-token-btn');
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`${API}/auth/github-tokens`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, token }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok || res.status === 201) {
+          qs('settings-github-token').value = '';
+          qs('github-token-name').value = '';
+          showAlert('github-alert', 'success', 'GitHub token saved.');
+          loadGithubTokens();
+        } else {
+          showAlert('github-alert', 'error', data.error ?? `Error ${res.status}`);
+        }
+      } catch {
+        showAlert('github-alert', 'error', 'Network error.');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function loadGithubTokens() {
+      const list = qs('github-tokens-list');
+      const empty = qs('github-tokens-empty');
+
+      try {
+        const res = await fetch(`${API}/auth/github-tokens`);
+        const tokens = await res.json().catch(() => []);
+
+        list.innerHTML = '';
+
+        if (!Array.isArray(tokens) || tokens.length === 0) {
+          empty.textContent = 'No saved tokens. Add one above.';
+          empty.style.display = '';
+          return;
+        }
+
+        empty.style.display = 'none';
+
+        tokens.forEach((t) => {
+          const createdStr = new Date(t.createdAt).toLocaleDateString();
+          const card = document.createElement('div');
+          card.className = 'key-card';
+          card.innerHTML = `
+            <div class="key-card-info">
+              <div class="key-card-name">${escHtml(t.name)}</div>
+              <div class="key-card-meta">
+                <span>Added: ${createdStr}</span>
+              </div>
+            </div>
+            <span class="key-card-hint">…${escHtml(t.tokenHint)}</span>
+            <button type="button" class="key-delete-btn" title="Delete token" data-gh-token-id="${t.id}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                <path d="M10 11v6"/><path d="M14 11v6"/>
+                <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+              </svg>
+            </button>
+          `;
+          list.appendChild(card);
+        });
+
+        list.querySelectorAll('.key-delete-btn[data-gh-token-id]').forEach((btn) => {
+          btn.addEventListener('click', () => deleteGithubToken(btn.dataset.ghTokenId));
+        });
+      } catch {
+        empty.textContent = 'Could not load tokens.';
+        empty.style.display = '';
+      }
+    }
+
+    async function deleteGithubToken(id) {
+      if (!confirm('Delete this GitHub token? This cannot be undone.')) return;
+
+      try {
+        const res = await fetch(`${API}/auth/github-tokens/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          showAlert('github-alert', 'success', 'GitHub token deleted.');
+          loadGithubTokens();
+        } else {
+          const data = await res.json().catch(() => ({}));
+          showAlert('github-alert', 'error', data.error ?? 'Failed to delete token.');
+        }
+      } catch {
+        showAlert('github-alert', 'error', 'Network error.');
+      }
+    }
+
+    // ── Auth state ──────────────────────────────────────────────────────
+    let currentUser = null;
+
+    async function checkAuth() {
+      try {
+        const res = await fetch(`${API}/auth/me`);
+        if (res.ok) {
+          currentUser = await res.json();
+          qs('user-bar').hidden = false;
+          qs('user-avatar').src = currentUser.avatarUrl ?? '';
+          qs('user-name').textContent = currentUser.username;
+          qs('apikey-login').hidden = true;
+          qs('apikey-authed').hidden = false;
+          qs('github-login').hidden = true;
+          qs('github-authed').hidden = false;
+          loadApiKeys();
+          loadGithubTokens();
+        } else {
+          currentUser = null;
+          qs('user-bar').hidden = true;
+          qs('apikey-login').hidden = false;
+          qs('apikey-authed').hidden = true;
+          qs('github-login').hidden = false;
+          qs('github-authed').hidden = true;
+        }
+      } catch {
+        currentUser = null;
+      }
+    }
+
+    async function logout() {
+      try {
+        await fetch(`${API}/auth/logout`, { method: 'POST' });
+      } catch { /* ignore */ }
+      currentUser = null;
+      qs('user-bar').hidden = true;
+      qs('apikey-login').hidden = false;
+      qs('apikey-authed').hidden = true;
+      qs('github-login').hidden = false;
+      qs('github-authed').hidden = true;
+    }
+
+    checkAuth();
+
+    // ── Subscribe ─────────────────────────────────────────────────────────
+    qs('subscribe-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearAlert('sub-alert');
+
+      const email = qs('sub-email').value.trim();
+      const repo = qs('sub-repo').value.trim();
+      const key = qs('sub-apikey').value.trim();
+
+      if (!email || !repo) {
+        showAlert('sub-alert', 'error', 'Email and repository are required.');
+        return;
+      }
+      if (!/^[^/]+\/[^/]+$/.test(repo)) {
+        showAlert('sub-alert', 'error', 'Repository must be in <code>owner/repo</code> format.');
+        return;
+      }
+
+      setLoading('sub-btn', true);
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (key) headers['X-Api-Key'] = key;
+        const res = await fetch(`${API}/subscribe`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ email, repo }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+          showAlert(
+            'sub-alert',
+            'success',
+            `<strong>Check your inbox!</strong> A confirmation email has been sent to <em>${escHtml(email)}</em>.`,
+          );
+          qs('subscribe-form').reset();
+        } else if (res.status === 401) {
+          showAlert('sub-alert', 'error', 'Invalid API key.');
+        } else if (res.status === 409) {
+          showAlert(
+            'sub-alert',
+            'warn',
+            data.error ?? 'You are already subscribed to this repository.',
+          );
+        } else {
+          showAlert('sub-alert', 'error', data.error ?? `Unexpected error (${res.status}).`);
+        }
+      } catch {
+        showAlert('sub-alert', 'error', 'Network error — is the server running?');
+      } finally {
+        setLoading('sub-btn', false);
+      }
+    });
+
+    // ── Manage ────────────────────────────────────────────────────────────
+    qs('manage-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearAlert('mgmt-alert');
+      qs('sub-list').hidden = true;
+      qs('sub-list').innerHTML = '';
+
+      const email = qs('mgmt-email').value.trim();
+      const key = qs('mgmt-apikey').value.trim();
+
+      if (!email) {
+        showAlert('mgmt-alert', 'error', 'Email address is required.');
+        return;
+      }
+
+      setLoading('mgmt-btn', true);
+      try {
+        const fetchHeaders = {};
+        if (key) fetchHeaders['X-Api-Key'] = key;
+        const res = await fetch(`${API}/subscriptions?email=${encodeURIComponent(email)}`, {
+          headers: fetchHeaders,
+        });
+        const data = await res.json().catch(() => []);
+
+        if (res.status === 401) {
+          showAlert('mgmt-alert', 'error', 'Invalid API key.');
+          return;
+        }
+        if (!res.ok) {
+          showAlert('mgmt-alert', 'error', data.error ?? `Error ${res.status}`);
+          return;
+        }
+        if (!Array.isArray(data) || data.length === 0) {
+          showAlert('mgmt-alert', 'info', 'No subscriptions found for this email.');
+          return;
+        }
+
+        const list = qs('sub-list');
+        data.forEach((sub) => {
+          const li = document.createElement('li');
+          li.className = 'sub-item';
+
+          const confirmed = sub.confirmed;
+          const tag = sub.last_seen_tag
+            ? `<span style="color:var(--muted);font-size:.75rem">last seen: ${escHtml(sub.last_seen_tag)}</span>`
+            : '';
+
+          li.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--muted)" aria-hidden="true">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+                0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13
+                -.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66
+                .07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15
+                -.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27
+                .68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12
+                .51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48
+                0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+            </svg>
+            <span class="repo">${escHtml(sub.repo)}</span>
+            ${tag}
+            <span class="badge ${confirmed ? 'badge-ok' : 'badge-pending'}">
+              ${confirmed ? 'confirmed' : 'pending'}
+            </span>
+          `;
+          list.appendChild(li);
+        });
+
+        list.hidden = false;
+      } catch {
+        showAlert('mgmt-alert', 'error', 'Network error — is the server running?');
+      } finally {
+        setLoading('mgmt-btn', false);
+      }
+    });
+
+    // ── Token actions (confirm / unsubscribe) ─────────────────────────────
+    function escHtml(str) {
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    async function handleToken(action, token) {
+      const panel = qs('token-panel');
+      const iconWrap = qs('token-icon');
+      const title = qs('token-title');
+      const body = qs('token-body');
+
+      qs('main-ui').style.display = 'none';
+      panel.classList.add('active');
+
+      title.textContent = 'Processing…';
+      body.textContent = 'Please wait.';
+
+      try {
+        const res = await fetch(`${API}/${action}/${encodeURIComponent(token)}`);
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+          iconWrap.className = 'icon-circle icon-circle-success';
+          iconWrap.innerHTML = `
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--success)"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>`;
+          title.textContent = action === 'confirm' ? 'Email confirmed!' : 'Unsubscribed';
+          body.textContent = data.message ?? 'Done.';
+        } else {
+          iconWrap.className = 'icon-circle icon-circle-danger';
+          iconWrap.innerHTML = `
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--danger)"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>`;
+          title.textContent = 'Something went wrong';
+          body.textContent = data.error ?? `HTTP ${res.status}`;
+        }
+      } catch {
+        iconWrap.className = 'icon-circle icon-circle-danger';
+        title.textContent = 'Network error';
+        body.textContent = 'Could not reach the server.';
+      }
+    }
+
+    // ── URL routing ───────────────────────────────────────────────────────
+    (function routeFromUrl() {
+      const path = window.location.pathname;
+
+      const confirm = path.match(/\/confirm\/([^/]+)/);
+      const unsubscribe = path.match(/\/unsubscribe\/([^/]+)/);
+
+      if (confirm) {
+        handleToken('confirm', confirm[1]);
+        return;
+      }
+      if (unsubscribe) {
+        handleToken('unsubscribe', unsubscribe[1]);
+        return;
+      }
+
+      const params = new URLSearchParams(window.location.search);
+
+      // Pre-fill API key from ?key= query param (useful for shared admin links).
+      const key = params.get('key');
+      if (key) {
+        qs('settings-key').value = key;
+      }
+
+      // Handle OAuth redirect (?tab=apikey after login)
+      const tabParam = params.get('tab');
+      if (tabParam && ['subscribe', 'manage', 'github', 'apikey'].includes(tabParam)) {
+        switchTab(tabParam);
+        // Clean URL
+        window.history.replaceState({}, '', window.location.pathname);
+      } else {
+        // Restore last active tab
+        const saved = localStorage.getItem('activeTab');
+        if (saved && ['subscribe', 'manage', 'github', 'apikey'].includes(saved)) {
+          switchTab(saved);
+        }
+      }
+
+      // Handle auth error
+      if (params.get('auth_error')) {
+        switchTab('apikey');
+        showAlert('apikey-alert', 'error', 'GitHub login failed. Please try again.');
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    })();

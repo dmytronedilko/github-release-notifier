@@ -1,0 +1,27 @@
+include ../mixins/ui.pug
+
+#panel-github.panel
+  .alert#github-alert
+
+  +githubLoginSection('github-login', 'Log in with your GitHub account to manage GitHub tokens.')
+
+  #github-authed(hidden)
+    .field
+      label(for="github-token-name") Token name
+      input#github-token-name(type="text" placeholder="e.g. Personal, Work" autocomplete="off")
+
+    .field
+      label(for="settings-github-token") GitHub token
+      +passwordRow('settings-github-token', 'ghp_••••••••')
+      p.hint
+        | Increases GitHub API rate limit from 60 to 5 000 req/hr.
+        |
+        a(href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener" style="color: var(--accent); text-decoration: none") Create token
+
+    button.btn(type="button" onclick="saveGithubToken()" id="save-gh-token-btn" style="margin-top: 0.75rem") Save GitHub token
+
+    hr.divider
+
+    label(style="margin-bottom: 0.75rem") Saved tokens
+    #github-tokens-empty.hint(style="text-align:center;padding:1rem 0") Loading...
+    #github-tokens-list(style="display:flex;flex-direction:column;gap:0.5rem")

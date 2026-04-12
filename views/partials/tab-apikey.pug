@@ -1,0 +1,32 @@
+include ../mixins/ui.pug
+
+#panel-apikey.panel
+  .alert#apikey-alert
+
+  +githubLoginSection('apikey-login', 'Log in with your GitHub account to create and manage API keys.')
+
+  #apikey-authed(hidden)
+    form#apikey-form(novalidate)
+      .field
+        label(for="apikey-name") Key name
+        input#apikey-name(type="text" placeholder="e.g. Production, Testing" autocomplete="off")
+
+      .field
+        label(for="apikey-expires") Expiration date #[span(style="text-transform:none;font-weight:400") (optional)]
+        input#apikey-expires(type="date" autocomplete="off")
+        p.hint Leave empty for a key that never expires.
+
+      .field
+        label(for="settings-key") Generated API key
+        +passwordRow('settings-key', "Click 'Generate' to create a key")(readonly)
+          button.icon-btn(type="button" title="Copy" onclick="copyKey()")
+            +copyIcon
+        p.hint Key is shown only once. Copy and save it.
+
+      button.btn(type="submit" id="gen-key-btn" style="margin-top: 0.75rem") Generate new API key
+
+    hr.divider
+
+    label(style="margin-bottom: 0.75rem") Your API keys
+    #keys-list-empty.hint(style="text-align:center;padding:1rem 0") Loading…
+    #keys-list(style="display:flex;flex-direction:column;gap:0.5rem")

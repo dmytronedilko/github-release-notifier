@@ -1,0 +1,21 @@
+include ../mixins/ui.pug
+
+#panel-subscribe.panel.active
+  .alert#sub-alert
+
+  form#subscribe-form(novalidate)
+    .field
+      label(for="sub-apikey") API Key
+      +passwordRow('sub-apikey', 'Paste your API key')
+      p.hint Generate a key in the #[a(href="#" onclick="switchTab('apikey');return false" style="color:var(--accent);text-decoration:none") API Key] tab. Add a #[a(href="#" onclick="switchTab('github');return false" style="color:var(--accent);text-decoration:none") GitHub token] for higher rate limits.
+
+    .field
+      label(for="sub-email") Email address
+      input#sub-email(type="email" placeholder="you@example.com" autocomplete="email" required)
+
+    .field
+      label(for="sub-repo") Repository
+      input#sub-repo(type="text" placeholder="owner/repository" autocomplete="off" required)
+      p.hint Example: #[code facebook/react]
+
+    button.btn(type="submit" id="sub-btn") Subscribe
